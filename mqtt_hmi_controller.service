@@ -1,0 +1,11 @@
+[Unit]
+Description=Contoller for tank edge computing
+After=syslog.target network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=simple
+ExecStart=/home/nano/repo/uart_nano_test/cpp/tank_hmi/test
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
