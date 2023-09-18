@@ -7,6 +7,7 @@
 #define STARTUP_DONE 16777215
 #define END 0xffffff
 #define COMPONENT_ID_INVALID 8606711807
+extern pthread_mutex_t mut;
 char PATH[] = "/dev/ttyTHS1";
 int BAUDRATE = 115200;
 struct termios saved_attributes;
@@ -29,16 +30,20 @@ void *read_thread(void *arg)
     int _n = 0;
     double end = 0;
     uint16_t flag = 0;
+    int *pub = (int *)arg;
+    
     memset(buff, 0, BUF_SIZE);
 
     printf("starting reading thread\n");
     while (1)
     {
         _n = read(fd, (char *)buff, BUF_SIZE);
-        printf("size %d reading= ", _n);
+        // printf("size %d reading= ", _n);
+        /*
         for (int i = 0; i < _n; i++)
             printf(" %02x ", buff[i]);
         printf("\n");
+        */
 
         if (_n > 3)
         {
@@ -75,19 +80,53 @@ void *read_thread(void *arg)
                 {
                     printf("\nTouch Event %02x Page: %d Component: %d TouchEvent %d \n", buff[i], buff[i + 1], buff[i + 2], buff[i + 3]);
                 }
+                if (buff[i] == '#')
+                {
+                    if (buff[i + 1] == '1' && buff[i + 2] == '0')
+                    {
+                        //printf("pub: %d:\n",*pub);
+                        pthread_mutex_lock(&mut);
+                        switch (buff[i + 3])
+                        {
+                        case '0':
+                            *pub = 0;
+                             printf("%d\n",*pub);
+                            break;
+                        case '1':
+                            *pub = 1;
+                             printf("%d\n",*pub);
+                            break;
+                        case '2':
+                            *pub = 2;
+                             printf("%d\n",*pub);
+                            break;
+                        case '3':
+                            *pub = 3;
+                             printf("%d\n",*pub);
+                            break;
+                        case '4':
+                            *pub = 4;
+                             printf("%d\n",*pub);
+                            break;
+                        default:
+                            break;
+                        }
+                        pthread_mutex_unlock(&mut);
+                    }
+                }
             }
-/*
-            if (flag & MASK)
-                printf("STARTUP \n");
-            if (flag >> 1 & MASK)
-                printf("NEXTION READY \n");
-            if (flag >> 2 & MASK)
-                printf("invalid component id \n");
-            if (flag >> 3 & MASK)
-                printf("invalid page id \n");
-            if (flag >> 4 & MASK)
-                printf("instruction successfull \n");
-*/
+            /*
+                        if (flag & MASK)
+                            printf("STARTUP \n");
+                        if (flag >> 1 & MASK)
+                            printf("NEXTION READY \n");
+                        if (flag >> 2 & MASK)
+                            printf("invalid component id \n");
+                        if (flag >> 3 & MASK)
+                            printf("invalid page id \n");
+                        if (flag >> 4 & MASK)
+                            printf("instruction successfull \n");
+            */
             flag = 0;
             memset(buff, 0, _n);
         }
@@ -98,13 +137,14 @@ void *read_thread(void *arg)
 
 Nextion_driver::Nextion_driver()
 {
+
     memset(buff, 0, BUF_SIZE);
 
     fd = open(PATH, O_RDWR | O_NOCTTY);
 
     if (fd < 0)
     {
-        printf("Error creating File Descriptor opening %s \n",PATH);
+        printf("Error creating File Descriptor opening %s \n", PATH);
         exit(0);
     }
 
@@ -124,20 +164,21 @@ Nextion_driver::Nextion_driver()
     tty.c_lflag = 0;
 
     tty.c_cc[VTIME] = 11; /* inter-character timer unused */
-    tty.c_cc[VMIN] = 4;  /* blocking read until 5 chars received */
+    tty.c_cc[VMIN] = 4;   /* blocking read until 5 chars received */
 
     tcflush(fd, TCIFLUSH);
     tcsetattr(fd, TCSANOW, &tty);
 
     pthread_t r_thread;
-    int ret = pthread_create(&r_thread, NULL, &read_thread, NULL);
+    publish = 99;
+    int ret = pthread_create(&r_thread, NULL, &read_thread, (void *)&publish);
     if (ret != 0)
     {
         printf("Error: pthread_create() failed\n");
         exit(EXIT_FAILURE);
     }
 
-    //init Nextion display
+    // init Nextion display
     write_com("rest");
 }
 
@@ -158,7 +199,7 @@ void Nextion_driver::write_com(std::string key, int val)
 
     write(fd, (char *)msg, sizeof(msg));
 
-    printf("wrote %s \n", msg);
+    // printf("wrote %s \n", msg);
 }
 
 void Nextion_driver::write_com(std::string key)
@@ -178,7 +219,7 @@ void Nextion_driver::write_com(std::string key)
 
     write(fd, (char *)msg, sizeof(msg));
 
-    printf("wrote %s \n", msg);
+    // printf("wrote %s \n", msg);
 }
 
 speed_t Nextion_driver::baudrate(int condition)

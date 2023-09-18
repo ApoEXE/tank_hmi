@@ -1,9 +1,14 @@
 [Unit]
 Description=Contoller for tank edge computing
+Wants=network-online.target
 After=syslog.target network.target remote-fs.target nss-lookup.target
 
 [Service]
+User=root
 Type=simple
+TimeoutStop=5
+RestartSec=1
+ExecStartPre=/bin/sleep 30
 ExecStart=/home/nano/repo/uart_nano_test/cpp/tank_hmi/test
 Restart=on-failure
 
